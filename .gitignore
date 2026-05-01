@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Root-level markdown except README
+/*.md
+!README.md
+
+# OS / editor
+.DS_Store
+
+# Generated graph output
+graphify-out/
+
+# Claude Code internals
+.claude/
