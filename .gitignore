@@ -19,5 +19,8 @@ wheels/
 # Generated graph output
 graphify-out/
 
+# Internal docs / specs
+docs/
+
 # Claude Code internals
 .claude/
