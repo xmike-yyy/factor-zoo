@@ -22,7 +22,6 @@ from factor_zoo.data.loader import (
     load_osap_returns,
     load_french_returns,
     build_french_metadata,
-    _FRENCH_PUB_YEARS,
 )
 from factor_zoo.analytics.stats import compute_all_stats
 

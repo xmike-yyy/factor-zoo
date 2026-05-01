@@ -24,6 +24,10 @@ def connect(path: Optional[Path] = None, read_only: bool = False) -> duckdb.Duck
 
 def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(_SCHEMA.read_text())
+    # Migration: add paper_t_stat to any existing DB that predates this column
+    conn.execute(
+        "ALTER TABLE factors ADD COLUMN IF NOT EXISTS paper_t_stat FLOAT"
+    )
 
 
 # ---------------------------------------------------------------------------
