@@ -6,6 +6,9 @@ from typing import Any
 import duckdb
 import pandas as pd
 
+from factor_zoo.analytics.correlation import correlation_matrix
+from factor_zoo.data.store import read_returns_wide_all
+
 
 def replication_score(conn: duckdb.DuckDBPyConnection, factor_id: str) -> dict[str, Any]:
     """Compare paper-reported t-stat to computed t-stat.
@@ -69,6 +72,30 @@ def zoo_summary(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
 
     med_rep = row["median_replication_score"]
 
+    # Most correlated pairs (top 20 by absolute correlation)
+    most_correlated_pairs = []
+    most_independent_factors = []
+    try:
+        wide = read_returns_wide_all(conn)
+        if not wide.empty and len(wide.columns) >= 2:
+            corr = correlation_matrix(wide.dropna(how="all"))
+            # Upper triangle only (avoid duplicates and self-correlations)
+            factors = list(corr.columns)
+            pairs = []
+            for i, fa in enumerate(factors):
+                for fb in factors[i + 1:]:
+                    c = float(corr.loc[fa, fb])
+                    if pd.notna(c):
+                        pairs.append({"factor_a": fa, "factor_b": fb, "correlation": round(c, 4)})
+            pairs.sort(key=lambda p: abs(p["correlation"]), reverse=True)
+            most_correlated_pairs = pairs[:20]
+
+            # Most independent: lowest average absolute pairwise correlation
+            avg_abs_corr = corr.abs().mean(axis=1)
+            most_independent_factors = avg_abs_corr.nsmallest(10).index.tolist()
+    except Exception:
+        pass  # if returns data is unavailable, skip these fields
+
     return {
         "n_factors": int(conn.execute("SELECT COUNT(*) FROM factors").fetchone()[0]),
         "pct_positive_post_pub_sharpe": round(float(row["pct_positive_post_pub_sharpe"] or 0.0), 4),
@@ -78,4 +105,6 @@ def zoo_summary(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             "median": round(float(row["median_t_stat"] or 0.0), 4),
             "pct_above_3": round(float(row["pct_above_3"] or 0.0), 4),
         },
+        "most_correlated_pairs": most_correlated_pairs,
+        "most_independent_factors": most_independent_factors,
     }

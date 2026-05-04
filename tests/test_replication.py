@@ -59,3 +59,31 @@ class TestZooSummary:
         result = zoo_summary(mem_conn)
         pct = result["pct_positive_post_pub_sharpe"]
         assert 0.0 <= pct <= 1.0
+
+
+def test_zoo_summary_has_most_correlated_pairs(mem_conn):
+    # mem_conn has Mom12m and Accruals with return data
+    result = zoo_summary(mem_conn)
+    assert "most_correlated_pairs" in result
+    assert isinstance(result["most_correlated_pairs"], list)
+    # With 2 factors there is 1 pair
+    if result["most_correlated_pairs"]:
+        pair = result["most_correlated_pairs"][0]
+        assert "factor_a" in pair
+        assert "factor_b" in pair
+        assert "correlation" in pair
+        assert -1.0 <= pair["correlation"] <= 1.0
+
+
+def test_zoo_summary_has_most_independent_factors(mem_conn):
+    result = zoo_summary(mem_conn)
+    assert "most_independent_factors" in result
+    assert isinstance(result["most_independent_factors"], list)
+
+
+def test_most_correlated_pairs_sorted_descending(mem_conn):
+    result = zoo_summary(mem_conn)
+    pairs = result["most_correlated_pairs"]
+    if len(pairs) >= 2:
+        corrs = [abs(p["correlation"]) for p in pairs]
+        assert corrs == sorted(corrs, reverse=True)
