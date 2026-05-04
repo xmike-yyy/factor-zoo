@@ -1,7 +1,10 @@
 """Download and normalize OSAP + Ken French data into polars DataFrames."""
+import datetime
 import io
+import os
 import re
 import zipfile
+from pathlib import Path
 from typing import Optional
 
 import polars as pl
@@ -74,6 +77,57 @@ _FRENCH_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+def _cache_dir() -> Path:
+    raw = os.environ.get("FACTOR_ZOO_CACHE_DIR")
+    return Path(raw) if raw else Path.home() / ".factor_zoo" / "cache"
+
+
+def _find_cache(prefix: str, max_age_days: int) -> "Path | None":
+    """Return the most recent cache file for prefix if within max_age_days, else None."""
+    if max_age_days == 0:
+        return None
+    d = _cache_dir()
+    if not d.exists():
+        return None
+    cutoff = datetime.date.today() - datetime.timedelta(days=max_age_days)
+    candidates = sorted(d.glob(f"{prefix}_*.parquet"), reverse=True)
+    for path in candidates:
+        date_str = path.stem[len(prefix) + 1:]  # e.g. "20260501"
+        try:
+            file_date = datetime.datetime.strptime(date_str, "%Y%m%d").date()
+        except ValueError:
+            continue
+        if file_date > cutoff:
+            return path
+    return None
+
+
+def _save_cache(prefix: str, df: "pl.DataFrame") -> None:
+    """Save df to cache as {prefix}_{YYYYMMDD}.parquet."""
+    d = _cache_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    today = datetime.date.today().strftime("%Y%m%d")
+    df.write_parquet(d / f"{prefix}_{today}.parquet")
+
+
+def _clean_old_cache(max_age_days: int = 30) -> None:
+    """Delete cache files older than max_age_days."""
+    d = _cache_dir()
+    if not d.exists():
+        return
+    cutoff = datetime.date.today() - datetime.timedelta(days=max_age_days)
+    for path in d.glob("*.parquet"):
+        parts = path.stem.rsplit("_", 1)
+        if len(parts) != 2:
+            continue
+        try:
+            file_date = datetime.datetime.strptime(parts[1], "%Y%m%d").date()
+        except ValueError:
+            continue
+        if file_date < cutoff:
+            path.unlink()
+
+
 def _download_bytes(url: str, desc: str = "") -> bytes:
     resp = requests.get(url, stream=True, timeout=120)
     resp.raise_for_status()
@@ -90,8 +144,11 @@ def _download_bytes(url: str, desc: str = "") -> bytes:
 # OSAP
 # ---------------------------------------------------------------------------
 
-def load_osap_signal_doc() -> pl.DataFrame:
-    """Download OSAP signal documentation and return normalized DataFrame."""
+def load_osap_signal_doc(max_age_days: int = 7) -> pl.DataFrame:
+    """Download OSAP signal documentation, using cache if < max_age_days old."""
+    cache = _find_cache("osap_signals", max_age_days)
+    if cache:
+        return pl.read_parquet(cache)
     import openassetpricing as oap  # only needed during DB build
     openap = oap.OpenAP()
     raw = openap.dl_signal_doc("polars")
@@ -122,12 +179,15 @@ def load_osap_signal_doc() -> pl.DataFrame:
         "paper_url", "sample_start_year", "sample_end_year", "description", "source",
         "t_stat_paper",
     ])
+    _save_cache("osap_signals", doc)
     return doc
 
 
-def load_osap_returns() -> pl.DataFrame:
-    """Download OSAP long-short portfolio returns for all predictors.
-    Returns DataFrame with columns: factor_id, date, ls_return (decimal)."""
+def load_osap_returns(max_age_days: int = 7) -> pl.DataFrame:
+    """Download OSAP long-short portfolio returns, using cache if < max_age_days old."""
+    cache = _find_cache("osap_returns", max_age_days)
+    if cache:
+        return pl.read_parquet(cache)
     import openassetpricing as oap
     openap = oap.OpenAP()
     print("Downloading OSAP portfolio returns (this may take a minute)...")
@@ -138,6 +198,7 @@ def load_osap_returns() -> pl.DataFrame:
         pl.col("date"),
         (pl.col("ret") / 100.0).alias("ls_return"),  # percent → decimal
     ])
+    _save_cache("osap_returns", result)
     return result
 
 
