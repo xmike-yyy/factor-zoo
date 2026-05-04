@@ -97,7 +97,7 @@ def _find_cache(prefix: str, max_age_days: int) -> "Path | None":
             file_date = datetime.datetime.strptime(date_str, "%Y%m%d").date()
         except ValueError:
             continue
-        if file_date > cutoff:
+        if file_date >= cutoff:
             return path
     return None
 
