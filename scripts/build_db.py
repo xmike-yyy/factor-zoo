@@ -34,18 +34,23 @@ def _year_to_date(year: int | None, last_day: bool = False) -> datetime.date | N
     return datetime.date(year, 1, 1)
 
 
-def main() -> None:
+def main(no_cache: bool = False) -> None:
     db = db_path()
     print(f"Building database at: {db}")
 
+    from factor_zoo.data.loader import _clean_old_cache
+    _clean_old_cache(max_age_days=30)
+
     conn = connect()
     init_schema(conn)
+
+    max_age = 0 if no_cache else 7
 
     # ------------------------------------------------------------------
     # 1. OSAP signal documentation
     # ------------------------------------------------------------------
     print("\n[1/4] Loading OSAP signal documentation...")
-    doc = load_osap_signal_doc()
+    doc = load_osap_signal_doc(max_age_days=max_age)
     print(f"      {len(doc)} predictors found in OSAP documentation")
 
     # Convert year columns → date columns for factors table
@@ -79,7 +84,7 @@ def main() -> None:
     # 2. OSAP portfolio returns
     # ------------------------------------------------------------------
     print("\n[2/4] Loading OSAP long-short returns...")
-    osap_returns = load_osap_returns()
+    osap_returns = load_osap_returns(max_age_days=max_age)
     # Only keep factors that are in the doc
     valid_ids = set(doc["id"].to_list())
     osap_returns = osap_returns.filter(pl.col("factor_id").is_in(valid_ids))
@@ -217,4 +222,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Build the Factor Zoo DuckDB database.")
+    parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Force re-download from OSAP, ignoring any cached parquet files."
+    )
+    args = parser.parse_args()
+    main(no_cache=args.no_cache)
