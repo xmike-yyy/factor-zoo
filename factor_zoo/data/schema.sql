@@ -30,3 +30,14 @@ CREATE TABLE IF NOT EXISTS factor_returns (
     ls_return FLOAT,   -- long-short monthly return as decimal (0.01 = 1%)
     PRIMARY KEY (factor_id, date)
 );
+
+CREATE TABLE IF NOT EXISTS factor_quintiles (
+    factor_id VARCHAR,
+    date DATE,
+    q1 FLOAT,
+    q2 FLOAT,
+    q3 FLOAT,
+    q4 FLOAT,
+    q5 FLOAT,
+    PRIMARY KEY (factor_id, date)
+);

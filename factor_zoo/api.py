@@ -24,12 +24,14 @@ from factor_zoo.data.store import (
     read_factors,
     read_returns,
     read_returns_wide,
+    read_quintiles,
 )
 from factor_zoo.analytics.correlation import correlation_matrix as _corr_matrix
 from factor_zoo.analytics.decay import DecayResult, compute_decay
 from factor_zoo.analytics.portfolio import PortfolioResult, construct_portfolio
 from factor_zoo.analytics.cluster import ClusterResult, cluster_factors as _cluster_factors
 from factor_zoo.analytics.exposure import ExposureResult, compute_exposure
+from factor_zoo.analytics.quintiles import QuintileResult, compute_quintile_analysis
 from factor_zoo.analytics.replication import replication_score as _replication_score
 from factor_zoo.analytics.replication import zoo_summary as _zoo_summary
 
@@ -268,6 +270,33 @@ class FactorZoo:
         category_map = dict(zip(cat_rows["id"], cat_rows["category"]))
 
         return _cluster_factors(wide, n_clusters=n_clusters, category_map=category_map)
+
+    def get_quintiles(self, factor_id: str) -> pd.DataFrame:
+        """Quintile value-weighted returns for one factor. Columns q1–q5, DatetimeIndex.
+
+        Raises KeyError if the factor has no quintile data (French factors won't have it;
+        run build_db.py to populate OSAP quintile data).
+        """
+        df = read_quintiles(self._conn, factor_id)
+        if df.empty:
+            raise KeyError(
+                f"Factor '{factor_id}' has no quintile data. "
+                "French factors do not have quintiles; OSAP factors require a DB rebuild "
+                "with load_osap_quintiles() wired in build_db.py."
+            )
+        return df
+
+    def quintile_spread(self, factor_id: str) -> pd.Series:
+        """Monthly q5 - q1 return (decimal) for one factor, as a pandas Series."""
+        df = self.get_quintiles(factor_id)
+        spread = df["q5"] - df["q1"]
+        spread.name = factor_id
+        return spread
+
+    def quintile_analysis(self, factor_id: str) -> QuintileResult:
+        """Full quintile analysis: spread, monotonicity score, Sharpe, and plot."""
+        df = self.get_quintiles(factor_id)
+        return compute_quintile_analysis(factor_id, df)
 
     def exposure(
         self,
