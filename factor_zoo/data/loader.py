@@ -202,6 +202,42 @@ def load_osap_returns(max_age_days: int = 7) -> pl.DataFrame:
     return result
 
 
+def _pivot_quintiles(raw: pl.DataFrame) -> pl.DataFrame:
+    """Pivot long-format (Q1..Q5 rows) to wide (q1..q5 columns), percent → decimal.
+    Input must have columns: signalname, date, port, ret."""
+    ports = ["Q1", "Q2", "Q3", "Q4", "Q5"]
+    df = raw.filter(pl.col("port").is_in(ports))
+    pivoted = df.pivot(
+        values="ret",
+        index=["signalname", "date"],
+        on="port",
+        aggregate_function="first",
+    )
+    pivoted = pivoted.rename({
+        "signalname": "factor_id",
+        "Q1": "q1", "Q2": "q2", "Q3": "q3", "Q4": "q4", "Q5": "q5",
+    })
+    for q in ["q1", "q2", "q3", "q4", "q5"]:
+        pivoted = pivoted.with_columns((pl.col(q) / 100.0).alias(q))
+    return pivoted.select(["factor_id", "date", "q1", "q2", "q3", "q4", "q5"])
+
+
+def load_osap_quintiles(max_age_days: int = 7) -> pl.DataFrame:
+    """Download OSAP quintile portfolio returns, using cache if < max_age_days old."""
+    cache = _find_cache("osap_quintiles", max_age_days)
+    if cache:
+        return pl.read_parquet(cache)
+    import openassetpricing as oap
+    openap = oap.OpenAP()
+    print("Downloading OSAP quintile returns...")
+    raw = openap.dl_port("quintiles_vw", "polars")
+    if "Cat.Signal" in raw.columns:
+        raw = raw.filter(pl.col("Cat.Signal") == "Predictor")
+    result = _pivot_quintiles(raw)
+    _save_cache("osap_quintiles", result)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Ken French
 # ---------------------------------------------------------------------------
