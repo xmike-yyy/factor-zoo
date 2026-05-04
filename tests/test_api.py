@@ -13,26 +13,10 @@ from factor_zoo.api import FactorZoo
 
 @pytest.fixture
 def fz(tmp_path, monkeypatch):
+    from factor_zoo.data.store import init_schema
     db_file = tmp_path / "test.db"
     conn = duckdb.connect(str(db_file))
-    conn.execute("""
-        CREATE TABLE factors (
-            id VARCHAR PRIMARY KEY, name VARCHAR, category VARCHAR,
-            subcategory VARCHAR, authors VARCHAR, year INTEGER, journal VARCHAR,
-            paper_url VARCHAR, sample_start DATE, sample_end DATE,
-            n_stocks_avg INTEGER, description TEXT,
-            ann_return FLOAT, ann_vol FLOAT, sharpe FLOAT, max_drawdown FLOAT,
-            t_stat FLOAT, pre_pub_sharpe FLOAT, post_pub_sharpe FLOAT,
-            has_short_history BOOLEAN DEFAULT FALSE, source VARCHAR,
-            paper_t_stat FLOAT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE factor_returns (
-            factor_id VARCHAR, date DATE, ls_return FLOAT,
-            PRIMARY KEY (factor_id, date)
-        )
-    """)
+    init_schema(conn)
     conn.execute("""
         INSERT INTO factors VALUES
             ('Mom12m', 'Momentum 12-1', 'momentum', NULL, 'Jegadeesh', 1993, 'JF',

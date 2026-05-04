@@ -64,6 +64,30 @@ def upsert_returns(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> None:
     conn.unregister("_returns_staging")
 
 
+def upsert_quintiles(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> None:
+    """Insert or replace rows in factor_quintiles.
+    df must have columns: factor_id, date, q1, q2, q3, q4, q5 (decimal returns)."""
+    conn.register("_quintiles_staging", df.to_pandas())
+    conn.execute("""
+        INSERT OR REPLACE INTO factor_quintiles (factor_id, date, q1, q2, q3, q4, q5)
+        SELECT factor_id, date, q1, q2, q3, q4, q5 FROM _quintiles_staging
+    """)
+    conn.unregister("_quintiles_staging")
+
+
+def read_quintiles(conn: duckdb.DuckDBPyConnection, factor_id: str) -> pd.DataFrame:
+    """Return quintile returns for one factor. Columns q1–q5, DatetimeIndex."""
+    df = conn.execute(
+        "SELECT date, q1, q2, q3, q4, q5 FROM factor_quintiles WHERE factor_id = ? ORDER BY date",
+        [factor_id],
+    ).df()
+    if df.empty:
+        return pd.DataFrame(columns=["q1", "q2", "q3", "q4", "q5"])
+    df = df.set_index("date")
+    df.index = pd.to_datetime(df.index)
+    return df
+
+
 # ---------------------------------------------------------------------------
 # Read helpers (return pandas for public API compatibility)
 # ---------------------------------------------------------------------------
