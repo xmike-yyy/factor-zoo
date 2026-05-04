@@ -85,6 +85,7 @@ def read_quintiles(conn: duckdb.DuckDBPyConnection, factor_id: str) -> pd.DataFr
         return pd.DataFrame(columns=["q1", "q2", "q3", "q4", "q5"])
     df = df.set_index("date")
     df.index = pd.to_datetime(df.index)
+    df.index.name = None
     return df
 
 
