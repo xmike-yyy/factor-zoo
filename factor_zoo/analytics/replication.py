@@ -17,9 +17,16 @@ def replication_score(conn: duckdb.DuckDBPyConnection, factor_id: str) -> dict[s
     Returns {"error": ...} if paper_t_stat is unavailable.
     Raises KeyError if factor not found.
     """
-    row = conn.execute(
-        "SELECT paper_t_stat, t_stat FROM factors WHERE id = ?", [factor_id]
-    ).df()
+    try:
+        row = conn.execute(
+            "SELECT paper_t_stat, t_stat FROM factors WHERE id = ?", [factor_id]
+        ).df()
+    except Exception:
+        # paper_t_stat column absent in older DBs — verify factor exists
+        row2 = conn.execute("SELECT t_stat FROM factors WHERE id = ?", [factor_id]).df()
+        if row2.empty:
+            raise KeyError(f"Factor '{factor_id}' not found in database.")
+        return {"error": "paper_t_stat unavailable — run factorzoo build to refresh"}
     if row.empty:
         raise KeyError(f"Factor '{factor_id}' not found in database.")
 
@@ -55,20 +62,35 @@ def replication_score(conn: duckdb.DuckDBPyConnection, factor_id: str) -> dict[s
 
 def zoo_summary(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     """Aggregate statistics about the entire factor zoo."""
-    row = conn.execute("""
-        SELECT
-            COUNT(*) AS n_factors,
-            AVG(CASE WHEN post_pub_sharpe > 0 THEN 1.0 ELSE 0.0 END)
-                AS pct_positive_post_pub_sharpe,
-            MEDIAN(CASE WHEN paper_t_stat > 0 AND t_stat IS NOT NULL
-                        THEN t_stat / paper_t_stat END)
-                AS median_replication_score,
-            AVG(t_stat) AS mean_t_stat,
-            MEDIAN(t_stat) AS median_t_stat,
-            AVG(CASE WHEN t_stat >= 3.0 THEN 1.0 ELSE 0.0 END) AS pct_above_3
-        FROM factors
-        WHERE t_stat IS NOT NULL
-    """).df().iloc[0]
+    try:
+        row = conn.execute("""
+            SELECT
+                COUNT(*) AS n_factors,
+                AVG(CASE WHEN post_pub_sharpe > 0 THEN 1.0 ELSE 0.0 END)
+                    AS pct_positive_post_pub_sharpe,
+                MEDIAN(CASE WHEN paper_t_stat > 0 AND t_stat IS NOT NULL
+                            THEN t_stat / paper_t_stat END)
+                    AS median_replication_score,
+                AVG(t_stat) AS mean_t_stat,
+                MEDIAN(t_stat) AS median_t_stat,
+                AVG(CASE WHEN t_stat >= 3.0 THEN 1.0 ELSE 0.0 END) AS pct_above_3
+            FROM factors
+            WHERE t_stat IS NOT NULL
+        """).df().iloc[0]
+    except Exception:
+        # paper_t_stat column absent in older DBs
+        row = conn.execute("""
+            SELECT
+                COUNT(*) AS n_factors,
+                AVG(CASE WHEN post_pub_sharpe > 0 THEN 1.0 ELSE 0.0 END)
+                    AS pct_positive_post_pub_sharpe,
+                NULL AS median_replication_score,
+                AVG(t_stat) AS mean_t_stat,
+                MEDIAN(t_stat) AS median_t_stat,
+                AVG(CASE WHEN t_stat >= 3.0 THEN 1.0 ELSE 0.0 END) AS pct_above_3
+            FROM factors
+            WHERE t_stat IS NOT NULL
+        """).df().iloc[0]
 
     med_rep = row["median_replication_score"]
 
