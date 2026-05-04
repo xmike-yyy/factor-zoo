@@ -301,3 +301,63 @@ class TestExposure:
         user_ret = pd.Series(rng.normal(0.005, 0.04, 120), index=dates)
         result = fz.exposure(user_ret, top_n=2)
         assert len(result.loadings) == 2
+
+
+# ---------------------------------------------------------------------------
+# quintile API
+# ---------------------------------------------------------------------------
+
+class TestQuintileAPI:
+    @pytest.fixture
+    def fz_with_quintiles(self, fz, tmp_path):
+        """fz fixture with quintile data seeded into the DB."""
+        import duckdb
+        import polars as pl
+        from factor_zoo.data.store import upsert_quintiles, init_schema
+
+        db_path_str = fz._conn.execute("PRAGMA database_list").df().iloc[-1]["file"]
+        # Close the read-only connection before opening a writable one
+        fz.close()
+        wconn = duckdb.connect(db_path_str)
+        init_schema(wconn)  # ensures factor_quintiles exists
+
+        dates = pd.date_range("2000-01-31", periods=24, freq="ME")
+        df = pl.DataFrame({
+            "factor_id": ["Mom12m"] * 24,
+            "date": [d.date() for d in dates],
+            "q1": [-0.02] * 24,
+            "q2": [-0.01] * 24,
+            "q3": [0.00] * 24,
+            "q4": [0.01] * 24,
+            "q5": [0.02 if i % 2 == 0 else 0.025 for i in range(24)],
+        })
+        upsert_quintiles(wconn, df)
+        wconn.close()
+
+        # Re-open fz with a fresh read_only connection to pick up new data
+        from factor_zoo.api import FactorZoo
+        new_fz = FactorZoo(db=db_path_str)
+        yield new_fz
+        new_fz.close()
+
+    def test_get_quintiles_returns_dataframe(self, fz_with_quintiles):
+        result = fz_with_quintiles.get_quintiles("Mom12m")
+        assert isinstance(result, pd.DataFrame)
+        assert list(result.columns) == ["q1", "q2", "q3", "q4", "q5"]
+        assert len(result) == 24
+
+    def test_get_quintiles_raises_for_no_data(self, fz_with_quintiles):
+        with pytest.raises(KeyError):
+            fz_with_quintiles.get_quintiles("HML")  # no quintile data for HML
+
+    def test_quintile_spread_is_q5_minus_q1(self, fz_with_quintiles):
+        spread = fz_with_quintiles.quintile_spread("Mom12m")
+        assert isinstance(spread, pd.Series)
+        assert abs(spread.iloc[0] - 0.04) < 1e-6  # 0.02 - (-0.02) = 0.04
+
+    def test_quintile_analysis_returns_result(self, fz_with_quintiles):
+        from factor_zoo.analytics.quintiles import QuintileResult
+        result = fz_with_quintiles.quintile_analysis("Mom12m")
+        assert isinstance(result, QuintileResult)
+        assert result.monotonicity_score == 1.0
+        assert result.spread_sharpe > 0

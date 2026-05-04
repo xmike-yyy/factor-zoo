@@ -16,10 +16,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 import polars as pl
 
-from factor_zoo.data.store import connect, init_schema, upsert_factors, upsert_returns, db_path
+from factor_zoo.data.store import connect, init_schema, upsert_factors, upsert_returns, upsert_quintiles, db_path
 from factor_zoo.data.loader import (
     load_osap_signal_doc,
     load_osap_returns,
+    load_osap_quintiles,
     load_french_returns,
     build_french_metadata,
 )
@@ -135,6 +136,23 @@ def main(no_cache: bool = False) -> None:
     upsert_factors(conn, french_meta)
     upsert_returns(conn, french_returns)
     print(f"      {len(french_ids)} French factors loaded")
+
+    # ------------------------------------------------------------------
+    # 3b. OSAP quintile returns (new in v0.3.0)
+    # ------------------------------------------------------------------
+    print("\n[3b/4] Loading OSAP quintile returns...")
+    try:
+        osap_quintiles = load_osap_quintiles(max_age_days=max_age)
+        valid_ids_set = set(doc["id"].to_list())
+        osap_quintiles = osap_quintiles.filter(
+            pl.col("factor_id").is_in(valid_ids_set)
+        )
+        upsert_quintiles(conn, osap_quintiles)
+        print(f"      {osap_quintiles['factor_id'].n_unique()} factors, "
+              f"{len(osap_quintiles):,} quintile observations")
+    except Exception as e:
+        print(f"      WARNING: quintile loading failed: {e}")
+        print("      Continuing without quintile data.")
 
     # ------------------------------------------------------------------
     # 4. Compute and store all stats
