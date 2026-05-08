@@ -20,7 +20,7 @@ import streamlit as st
 # Streamlit Cloud: inject DB path from secrets if provided
 import os as _os
 if hasattr(st, "secrets") and "FACTOR_ZOO_DB" in st.secrets:
-    _os.environ["FACTOR_ZOO_DB"] = st.secrets["FACTOR_ZOO_DB"]
+    _os.environ["FACTOR_ZOO_DB"] = str(st.secrets["FACTOR_ZOO_DB"])
 
 from factor_zoo.data.store import connect, db_path, read_factors, read_returns, read_returns_wide
 
