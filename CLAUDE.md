@@ -86,8 +86,9 @@ Each module is a pure function + dataclass — no DB access. The `FactorZoo` API
 | `analytics/cluster.py` | `cluster_factors(wide_df, n_clusters, category_map)` | `ClusterResult` |
 | `analytics/exposure.py` | `compute_exposure(user_returns, factor_wide)` | `ExposureResult` |
 | `analytics/stats.py` | `compute_all_stats(returns, pub_year)` | `dict` |
-| `analytics/correlation.py` | `correlation_matrix(wide_df)` | `pd.DataFrame` |
+| `analytics/correlation.py` | `correlation_matrix(wide_df)`, `rolling_correlation(s1, s2, window)` | `pd.DataFrame` / `pd.Series` |
 | `analytics/quintiles.py` | `compute_quintile_analysis(factor_id, quintiles_df)` | `QuintileResult` |
+| `analytics/drawdown.py` | `compute_drawdown(returns, factor_id)` | `DrawdownResult` |
 
 ### Tests
 
@@ -101,6 +102,8 @@ Pyright false positives from `polars`, `openassetpricing`, and `streamlit` stubs
 
 - **v0.2.0** — complete. Analytics API (decay, portfolio, exposure, clustering, replication), CLI, auto-download DB.
 - **v0.3.0** — complete. Multipage Streamlit app (8 pages in `factor_zoo/pages/`), quintile returns, OSAP download cache. See `docs/superpowers/specs/2026-05-01-factorzoo-v030-design.md`.
+- **v0.4.0** — complete. Drawdown analytics, rolling correlation panel, Quintile Analysis page (`9_Quintiles.py`), Streamlit Cloud deployment config. See `docs/superpowers/specs/2026-05-07-factorzoo-v040-design.md`.
+- **v0.5.0** — planned. AQR data source, conditional factor performance/macro regimes, factor timing signals, CSV/PDF export, research quality badge system, international factors.
 
 ### Adding a new data source
 
@@ -115,17 +118,18 @@ Pyright false positives from `polars`, `openassetpricing`, and `streamlit` stubs
 `graphify-out/GRAPH_REPORT.md` contains a pre-built knowledge graph of this repo. Read it before any codebase exploration, architecture questions, or "where does X live" lookups — it's faster than grepping.
 
 **God nodes** (highest centrality — start here):
-- `FactorZoo` (54 edges) — central hub bridging API, CLI, tests, and data layers
-- `PortfolioResult`, `DecayResult`, `QuintileResult`, `ExposureResult` — result dataclasses connecting analytics to tests and UI
+- `FactorZoo` — central hub bridging API, CLI, tests, and data layers
+- `PortfolioResult`, `DecayResult`, `QuintileResult`, `ExposureResult`, `DrawdownResult` — result dataclasses connecting analytics to tests and UI
 - `construct_portfolio()` — bridge between Portfolio, Analytics, and DB layers
 - `get_conn()` — Streamlit's shared DB entry point
 
-**Community map** (17 labeled clusters):
+**Community map** (major clusters):
 - Analytics Results & Dataclasses · DuckDB Store & Remote Access · Performance Statistics
 - FactorZoo API Layer · OSAP Data Loading & Caching · Streamlit App & Build Pipeline
 - Portfolio Construction · Factor Decay Analysis · Replication & Zoo Summary
 - Factor Clustering & Correlation · Quintile Returns API · Factor Exposure Analysis
 - Command Line Interface · French Data Loader · Quintiles DB Layer
+- v0.4.0 Design & Planning Docs · Rolling Correlation · Publication Decay Concepts
 
 To query the graph: `/graphify query "<question>"` or `/graphify explain "<node>"`.
 To rebuild after major changes: `/graphify --update`.
