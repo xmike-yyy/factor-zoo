@@ -32,6 +32,7 @@ from factor_zoo.analytics.portfolio import PortfolioResult, construct_portfolio
 from factor_zoo.analytics.cluster import ClusterResult, cluster_factors as _cluster_factors
 from factor_zoo.analytics.exposure import ExposureResult, compute_exposure
 from factor_zoo.analytics.quintiles import QuintileResult, compute_quintile_analysis
+from factor_zoo.analytics.drawdown import DrawdownResult, compute_drawdown
 from factor_zoo.analytics.replication import replication_score as _replication_score
 from factor_zoo.analytics.replication import zoo_summary as _zoo_summary
 
@@ -234,6 +235,21 @@ class FactorZoo:
 
         returns = self.get_returns(factor_id)
         return compute_decay(returns, factor_id, pub_year)
+
+    def drawdown(self, factor_id: str) -> DrawdownResult:
+        """Compute drawdown statistics for a factor's return series.
+
+        Parameters
+        ----------
+        factor_id : str
+            Factor identifier, e.g. 'Mom12m'.
+
+        Returns
+        -------
+        DrawdownResult with underwater equity curve, max drawdown, and duration.
+        """
+        returns = self.get_returns(factor_id)
+        return compute_drawdown(returns, factor_id)
 
     def portfolio(
         self,

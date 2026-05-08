@@ -361,3 +361,24 @@ class TestQuintileAPI:
         assert isinstance(result, QuintileResult)
         assert result.monotonicity_score == 1.0
         assert result.spread_sharpe > 0
+
+
+# ---------------------------------------------------------------------------
+# drawdown
+# ---------------------------------------------------------------------------
+
+class TestDrawdown:
+    def test_returns_drawdown_result(self, fz):
+        from factor_zoo.analytics.drawdown import DrawdownResult
+        result = fz.drawdown("Mom12m")
+        assert isinstance(result, DrawdownResult)
+        assert result.factor_id == "Mom12m"
+
+    def test_max_drawdown_nonpositive(self, fz):
+        result = fz.drawdown("Mom12m")
+        assert result.max_drawdown <= 0.0
+
+    def test_drawdown_series_length_matches_returns(self, fz):
+        # Mom12m fixture has 120 return observations
+        result = fz.drawdown("Mom12m")
+        assert len(result.drawdown_series) == 120
