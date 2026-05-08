@@ -49,6 +49,13 @@ class TestComputeDrawdown:
         if result.max_drawdown < 0:
             assert result.max_drawdown_start <= result.max_drawdown_end
 
+    def test_known_drawdown_duration(self):
+        # Series: +100%, then -50% over 2 steps
+        # peak at index 0 (after +100%), trough at index 1 (after -50%)
+        # elapsed = 1 month
+        result = compute_drawdown(_series([1.0, -0.5]), "X")
+        assert result.max_drawdown_duration == 1
+
     def test_plot_returns_figure(self):
         result = compute_drawdown(_series([0.01] * 36), "X")
         assert isinstance(result.plot(), go.Figure)

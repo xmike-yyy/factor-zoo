@@ -83,7 +83,7 @@ def compute_drawdown(returns: pd.Series, factor_id: str) -> DrawdownResult:
 
     trough_idx = dd_series.idxmin()
     peak_idx = cum.loc[:trough_idx].idxmax()
-    duration = len(dd_series.loc[peak_idx:trough_idx])
+    duration = len(dd_series.loc[peak_idx:trough_idx]) - 1
 
     return DrawdownResult(
         factor_id=factor_id,
