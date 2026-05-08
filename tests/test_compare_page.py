@@ -1,7 +1,6 @@
 """Tests for rolling correlation logic used in the Compare page."""
 import pandas as pd
 import numpy as np
-import pytest
 from factor_zoo.analytics.correlation import rolling_correlation
 
 

@@ -79,6 +79,9 @@ def main():
             format_func=lambda w: f"{w}m",
         )
 
+        if window is None:
+            window = 36
+
         roll_factors = list(selected)
         if len(roll_factors) > 6:
             st.warning(
@@ -112,6 +115,8 @@ def main():
             )
             st.plotly_chart(fig, use_container_width=True)
             st.caption(f"Pearson correlation, {window}-month rolling window")
+        else:
+            st.info("No overlapping date range across the selected factors for this window size.")
 
     st.subheader("Summary Statistics")
     subset = factors_df[factors_df["id"].isin(selected)][
