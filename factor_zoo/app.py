@@ -17,6 +17,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+# Streamlit Cloud: inject DB path from secrets if provided
+import os as _os
+if hasattr(st, "secrets") and "FACTOR_ZOO_DB" in st.secrets:
+    _os.environ["FACTOR_ZOO_DB"] = str(st.secrets["FACTOR_ZOO_DB"])
+
 from factor_zoo.data.store import connect, db_path, read_factors, read_returns, read_returns_wide
 
 # ---------------------------------------------------------------------------
@@ -235,7 +240,7 @@ def main() -> None:
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Factors", n)
     col2.metric("Data Sources", "OSAP + Ken French")
-    col3.metric("API Version", "v0.3.0")
+    col3.metric("API Version", "v0.4.0")
 
 
 if __name__ == "__main__":

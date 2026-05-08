@@ -26,12 +26,16 @@ from factor_zoo.data.store import (
     read_returns_wide,
     read_quintiles,
 )
-from factor_zoo.analytics.correlation import correlation_matrix as _corr_matrix
+from factor_zoo.analytics.correlation import (
+    correlation_matrix as _corr_matrix,
+    rolling_correlation as _rolling_corr,
+)
 from factor_zoo.analytics.decay import DecayResult, compute_decay
 from factor_zoo.analytics.portfolio import PortfolioResult, construct_portfolio
 from factor_zoo.analytics.cluster import ClusterResult, cluster_factors as _cluster_factors
 from factor_zoo.analytics.exposure import ExposureResult, compute_exposure
 from factor_zoo.analytics.quintiles import QuintileResult, compute_quintile_analysis
+from factor_zoo.analytics.drawdown import DrawdownResult, compute_drawdown
 from factor_zoo.analytics.replication import replication_score as _replication_score
 from factor_zoo.analytics.replication import zoo_summary as _zoo_summary
 
@@ -218,6 +222,36 @@ class FactorZoo:
         wide = self.compare(factor_ids, start=start, end=end)
         return _corr_matrix(wide)
 
+    def rolling_correlation(
+        self,
+        factor_ids: list[str],
+        window: int = 36,
+    ) -> pd.DataFrame:
+        """Rolling pairwise Pearson correlations for a list of factors.
+
+        Parameters
+        ----------
+        factor_ids : list[str]
+            At least 2 factor identifiers.
+        window : int
+            Rolling window in months (default 36).
+
+        Returns
+        -------
+        pd.DataFrame with one column per pair (e.g., "Mom12m vs Accruals"),
+        DatetimeIndex. NaN for periods with insufficient data.
+        """
+        if len(factor_ids) < 2:
+            raise ValueError("rolling_correlation requires at least 2 factor IDs")
+        from itertools import combinations
+        wide = read_returns_wide(self._conn, factor_ids)
+        wide.index = pd.to_datetime(wide.index)
+        result: dict[str, pd.Series] = {}
+        for a, b in combinations(factor_ids, 2):
+            if a in wide.columns and b in wide.columns:
+                result[f"{a} vs {b}"] = _rolling_corr(pd.Series(wide[a]), pd.Series(wide[b]), window=window)
+        return pd.DataFrame(result)
+
     # ------------------------------------------------------------------
     # New analytics methods
     # ------------------------------------------------------------------
@@ -234,6 +268,21 @@ class FactorZoo:
 
         returns = self.get_returns(factor_id)
         return compute_decay(returns, factor_id, pub_year)
+
+    def drawdown(self, factor_id: str) -> DrawdownResult:
+        """Compute drawdown statistics for a factor's return series.
+
+        Parameters
+        ----------
+        factor_id : str
+            Factor identifier, e.g. 'Mom12m'.
+
+        Returns
+        -------
+        DrawdownResult with underwater equity curve, max drawdown, and duration.
+        """
+        returns = self.get_returns(factor_id)
+        return compute_drawdown(returns, factor_id)
 
     def portfolio(
         self,

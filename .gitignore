@@ -9,9 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
-# Root-level markdown except README
+# Root-level markdown except README and CLAUDE.md
 /*.md
 !README.md
+!CLAUDE.md
 
 # OS / editor
 .DS_Store
@@ -24,3 +25,4 @@ docs/
 
 # Claude Code internals
 .claude/
+.worktrees/

@@ -5,6 +5,8 @@ _repo_root = Path(__file__).parent.parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
+import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from factor_zoo.app import (
@@ -13,6 +15,22 @@ from factor_zoo.app import (
     fmt_pct, fmt_f, multi_cumulative_chart, correlation_heatmap,
 )
 from factor_zoo.analytics.correlation import correlation_matrix
+
+
+@st.cache_data(ttl=3600)
+def _cached_rolling_corr(factor_ids: tuple[str, ...], window: int) -> pd.DataFrame:
+    from factor_zoo.app import load_returns_wide
+    from factor_zoo.analytics.correlation import rolling_correlation
+    from itertools import combinations
+
+    wide = load_returns_wide(factor_ids)
+    result = {}
+    for a, b in combinations(factor_ids, 2):
+        if a in wide.columns and b in wide.columns:
+            result[f"{a} vs {b}"] = rolling_correlation(
+                pd.Series(wide[a]), pd.Series(wide[b]), window=window
+            )
+    return pd.DataFrame(result)
 
 
 def main():
@@ -48,6 +66,57 @@ def main():
         corr = correlation_matrix(wide.dropna(how="all"))
         if not corr.empty:
             st.plotly_chart(correlation_heatmap(corr), use_container_width=True)
+
+    st.subheader("Rolling Correlation")
+    if len(selected) < 2:
+        st.info("Select at least 2 factors to see rolling correlations.")
+    else:
+        window = st.radio(
+            "Window",
+            [12, 24, 36],
+            index=2,
+            horizontal=True,
+            format_func=lambda w: f"{w}m",
+        )
+
+        if window is None:
+            window = 36
+
+        roll_factors = list(selected)
+        if len(roll_factors) > 6:
+            st.warning(
+                "Rolling correlation is shown for up to 6 factors (15 pairs max). "
+                "Showing first 6."
+            )
+            roll_factors = roll_factors[:6]
+
+        rolling_df = _cached_rolling_corr(tuple(sorted(roll_factors)), window)
+
+        if not rolling_df.empty:
+            fig = go.Figure()
+            for col in rolling_df.columns:
+                fig.add_trace(go.Scatter(
+                    x=rolling_df.index,
+                    y=rolling_df[col],
+                    mode="lines",
+                    name=col,
+                    hovertemplate="%{x|%b %Y}: %{y:.2f}<extra></extra>",
+                ))
+            fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+            fig.update_layout(
+                title=f"Rolling {window}-Month Correlation",
+                xaxis_title="Date",
+                yaxis_title="Correlation",
+                yaxis=dict(range=[-1, 1]),
+                template="plotly_white",
+                margin=dict(t=40, b=40, l=60, r=20),
+                height=360,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption(f"Pearson correlation, {window}-month rolling window")
+        else:
+            st.info("No overlapping date range across the selected factors for this window size.")
 
     st.subheader("Summary Statistics")
     subset = factors_df[factors_df["id"].isin(selected)][

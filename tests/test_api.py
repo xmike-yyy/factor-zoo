@@ -361,3 +361,56 @@ class TestQuintileAPI:
         assert isinstance(result, QuintileResult)
         assert result.monotonicity_score == 1.0
         assert result.spread_sharpe > 0
+
+
+# ---------------------------------------------------------------------------
+# drawdown
+# ---------------------------------------------------------------------------
+
+class TestDrawdown:
+    def test_returns_drawdown_result(self, fz):
+        from factor_zoo.analytics.drawdown import DrawdownResult
+        result = fz.drawdown("Mom12m")
+        assert isinstance(result, DrawdownResult)
+        assert result.factor_id == "Mom12m"
+
+    def test_max_drawdown_nonpositive(self, fz):
+        result = fz.drawdown("Mom12m")
+        assert result.max_drawdown <= 0.0
+
+    def test_drawdown_series_length_matches_returns(self, fz):
+        # Mom12m fixture has 120 return observations
+        result = fz.drawdown("Mom12m")
+        assert len(result.drawdown_series) == 120
+
+
+# ---------------------------------------------------------------------------
+# rolling_correlation
+# ---------------------------------------------------------------------------
+
+class TestRollingCorrelation:
+    def test_returns_dataframe(self, fz):
+        df = fz.rolling_correlation(["Mom12m", "Accruals"])
+        assert isinstance(df, pd.DataFrame)
+        assert "Mom12m vs Accruals" in df.columns
+
+    def test_requires_two_factors(self, fz):
+        with pytest.raises(ValueError, match="at least 2"):
+            fz.rolling_correlation(["Mom12m"])
+
+    def test_all_pairs_present(self, fz):
+        df = fz.rolling_correlation(["Mom12m", "Accruals", "HML"])
+        assert "Mom12m vs Accruals" in df.columns
+        assert "Mom12m vs HML" in df.columns
+        assert "Accruals vs HML" in df.columns
+
+    def test_custom_window(self, fz):
+        df = fz.rolling_correlation(["Mom12m", "Accruals"], window=12)
+        # 120 periods, window=12 → should have ~108 valid (non-NaN) rows
+        non_null = df["Mom12m vs Accruals"].dropna()
+        assert len(non_null) >= 100
+
+    def test_values_in_valid_range(self, fz):
+        df = fz.rolling_correlation(["Mom12m", "Accruals"], window=24)
+        valid = df["Mom12m vs Accruals"].dropna()
+        assert (valid >= -1.0).all() and (valid <= 1.0).all()
