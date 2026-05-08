@@ -16,6 +16,15 @@ from factor_zoo.app import (
 )
 
 
+@st.cache_data(ttl=3600)
+def _cached_drawdown(factor_id: str):
+    from factor_zoo.analytics.drawdown import compute_drawdown
+    returns = load_returns(factor_id)
+    if returns.empty:
+        return None
+    return compute_drawdown(returns, factor_id)
+
+
 def _decay_bar_chart(row):
     import plotly.graph_objects as go
     pre = row.get("pre_pub_sharpe")
@@ -102,40 +111,59 @@ def main():
 
     st.divider()
     returns = load_returns(factor_id)
-    left, right = st.columns([3, 2])
-    with left:
-        log_scale = st.checkbox("Log scale", key="detail_log")
-        if not returns.empty:
-            st.plotly_chart(
-                cumulative_returns_chart(returns, log_scale=log_scale, color=CATEGORY_COLORS.get(cat, "#2196F3")),
-                use_container_width=True,
-            )
+
+    tab_overview, tab_drawdown = st.tabs(["Overview", "Drawdown"])
+
+    with tab_overview:
+        left, right = st.columns([3, 2])
+        with left:
+            log_scale = st.checkbox("Log scale", key="detail_log")
+            if not returns.empty:
+                st.plotly_chart(
+                    cumulative_returns_chart(returns, log_scale=log_scale, color=CATEGORY_COLORS.get(cat, "#2196F3")),
+                    use_container_width=True,
+                )
+            else:
+                st.info("No return data available.")
+        with right:
+            st.subheader("Performance Stats")
+            stats_df = pd.DataFrame([
+                ("Ann. Return", fmt_pct(row.get("ann_return"))),
+                ("Ann. Volatility", fmt_pct(row.get("ann_vol"))),
+                ("Sharpe Ratio", fmt_f(row.get("sharpe"))),
+                ("Max Drawdown", fmt_pct(row.get("max_drawdown"))),
+                ("t-Statistic", fmt_f(row.get("t_stat"))),
+            ], columns=["Metric", "Value"])
+            st.dataframe(stats_df, hide_index=True, use_container_width=True)
+
+        st.subheader("Publication Decay")
+        fig = _decay_bar_chart(row)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No return data available.")
-    with right:
-        st.subheader("Performance Stats")
-        stats_df = pd.DataFrame([
-            ("Ann. Return", fmt_pct(row.get("ann_return"))),
-            ("Ann. Volatility", fmt_pct(row.get("ann_vol"))),
-            ("Sharpe Ratio", fmt_f(row.get("sharpe"))),
-            ("Max Drawdown", fmt_pct(row.get("max_drawdown"))),
-            ("t-Statistic", fmt_f(row.get("t_stat"))),
-        ], columns=["Metric", "Value"])
-        st.dataframe(stats_df, hide_index=True, use_container_width=True)
+            st.caption("Pre/post publication Sharpe not available.")
 
-    st.subheader("Publication Decay")
-    fig = _decay_bar_chart(row)
-    if fig:
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.caption("Pre/post publication Sharpe not available.")
+        if row.get("description"):
+            st.subheader("Description")
+            st.write(row["description"])
 
-    if row.get("description"):
-        st.subheader("Description")
-        st.write(row["description"])
+        st.subheader("Use this factor")
+        st.markdown(code_snippet(factor_id))
 
-    st.subheader("Use this factor")
-    st.markdown(code_snippet(factor_id))
+    with tab_drawdown:
+        dd = _cached_drawdown(factor_id)
+        if dd is None:
+            st.info("No return data available for drawdown analysis.")
+        else:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Max Drawdown", fmt_pct(dd.max_drawdown))
+            col2.metric("Duration (months)", str(dd.max_drawdown_duration))
+            col3.metric("Current Drawdown", fmt_pct(dd.current_drawdown))
+            st.plotly_chart(dd.plot(), use_container_width=True)
+            if dd.max_drawdown_start is not None and dd.max_drawdown < 0:
+                st.caption(
+                    f"Worst drawdown: {str(dd.max_drawdown_start)[:7]} → {str(dd.max_drawdown_end)[:7]}"
+                )
 
 
 main()
