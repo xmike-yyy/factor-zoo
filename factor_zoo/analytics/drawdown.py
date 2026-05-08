@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, cast
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -71,7 +71,7 @@ def compute_drawdown(returns: pd.Series, factor_id: str) -> DrawdownResult:
     max_dd = float(dd_series.min())
 
     if max_dd >= 0:
-        first = clean.index[0]
+        first = cast(pd.Timestamp, clean.index[0])
         return DrawdownResult(
             factor_id=factor_id,
             drawdown_series=dd_series,
@@ -82,8 +82,8 @@ def compute_drawdown(returns: pd.Series, factor_id: str) -> DrawdownResult:
             current_drawdown=0.0,
         )
 
-    trough_idx = pd.Timestamp(dd_series.idxmin())
-    peak_idx = pd.Timestamp(cum.loc[:trough_idx].idxmax())
+    trough_idx = cast(pd.Timestamp, dd_series.idxmin())
+    peak_idx = cast(pd.Timestamp, cum.loc[:trough_idx].idxmax())
     duration = len(dd_series.loc[peak_idx:trough_idx]) - 1
 
     return DrawdownResult(
