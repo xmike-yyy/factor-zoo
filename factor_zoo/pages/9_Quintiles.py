@@ -26,7 +26,8 @@ def _cached_quintile(factor_id: str):
         result = fz.quintile_analysis(factor_id)
     except KeyError:
         result = None  # French factor or missing data
-    fz.close()
+    finally:
+        fz.close()
     return result
 
 
@@ -41,7 +42,8 @@ def _cached_spread(factor_id: str) -> "pd.Series | None":
         spread = fz.quintile_spread(factor_id)
     except KeyError:
         spread = None
-    fz.close()
+    finally:
+        fz.close()
     return spread
 
 
@@ -84,11 +86,13 @@ def main():
     target = st.session_state.get("quintile_factor")
     if target is None:
         st.stop()
+    assert isinstance(target, str)
 
     result = _cached_quintile(target)
     if result is None:
         st.info("Quintile data not available for this factor.")
         st.stop()
+    assert result is not None
 
     # Cumulative return chart
     st.plotly_chart(result.plot(), use_container_width=True)
@@ -129,34 +133,36 @@ def main():
             key="quintile_compare",
         )
         if compare_ids:
-            fig = go.Figure()
-            # Add current factor's spread
-            cum_main = (1 + result.spread.dropna()).cumprod()
-            fig.add_trace(go.Scatter(
-                x=cum_main.index,
-                y=cum_main.values,
-                name=target,
-                mode="lines",
-            ))
-            # Add comparison factors
-            for cid in compare_ids:
-                sp = _cached_spread(cid)
-                if sp is not None and not sp.empty:
-                    cum = (1 + sp.dropna()).cumprod()
-                    fig.add_trace(go.Scatter(
-                        x=cum.index,
-                        y=cum.values,
-                        name=cid,
-                        mode="lines",
-                    ))
-            fig.update_layout(
-                title="Q5–Q1 Spread Cumulative Return",
-                xaxis_title="Date",
-                yaxis_title="Cumulative Return (base=1)",
-                template="plotly_white",
-                height=360,
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            spread_clean = result.spread.dropna()
+            if spread_clean.empty:
+                st.info("No spread data available for this factor.")
+            else:
+                fig = go.Figure()
+                cum_main = (1 + spread_clean).cumprod()
+                fig.add_trace(go.Scatter(
+                    x=cum_main.index,
+                    y=cum_main.values,
+                    name=target,
+                    mode="lines",
+                ))
+                for cid in compare_ids:
+                    sp = _cached_spread(cid)
+                    if sp is not None and not sp.empty:
+                        cum = (1 + sp.dropna()).cumprod()
+                        fig.add_trace(go.Scatter(
+                            x=cum.index,
+                            y=cum.values,
+                            name=cid,
+                            mode="lines",
+                        ))
+                fig.update_layout(
+                    title="Q5–Q1 Spread Cumulative Return",
+                    xaxis_title="Date",
+                    yaxis_title="Cumulative Return (base=1)",
+                    template="plotly_white",
+                    height=360,
+                )
+                st.plotly_chart(fig, use_container_width=True)
         else:
             st.caption("Select factors above to compare their quintile spreads.")
 
