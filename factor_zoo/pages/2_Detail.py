@@ -17,8 +17,10 @@ from factor_zoo.app import (
 
 
 @st.cache_data(ttl=3600)
-def _cached_drawdown(factor_id: str, returns: pd.Series):
+def _cached_drawdown(factor_id: str):
+    from factor_zoo.app import load_returns
     from factor_zoo.analytics.drawdown import compute_drawdown
+    returns = load_returns(factor_id)
     if returns.empty:
         return None
     return compute_drawdown(returns, factor_id)
@@ -150,7 +152,7 @@ def main():
         st.markdown(code_snippet(factor_id))
 
     with tab_drawdown:
-        dd = _cached_drawdown(factor_id, returns)
+        dd = _cached_drawdown(factor_id)
         if dd is None:
             st.info("No return data available for drawdown analysis.")
         else:

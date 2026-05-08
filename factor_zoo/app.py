@@ -240,7 +240,7 @@ def main() -> None:
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Factors", n)
     col2.metric("Data Sources", "OSAP + Ken French")
-    col3.metric("API Version", "v0.3.0")
+    col3.metric("API Version", "v0.4.0")
 
 
 if __name__ == "__main__":
