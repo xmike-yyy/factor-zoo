@@ -17,9 +17,8 @@ from factor_zoo.app import (
 
 
 @st.cache_data(ttl=3600)
-def _cached_drawdown(factor_id: str):
+def _cached_drawdown(factor_id: str, returns: pd.Series):
     from factor_zoo.analytics.drawdown import compute_drawdown
-    returns = load_returns(factor_id)
     if returns.empty:
         return None
     return compute_drawdown(returns, factor_id)
@@ -151,7 +150,7 @@ def main():
         st.markdown(code_snippet(factor_id))
 
     with tab_drawdown:
-        dd = _cached_drawdown(factor_id)
+        dd = _cached_drawdown(factor_id, returns)
         if dd is None:
             st.info("No return data available for drawdown analysis.")
         else:
@@ -160,7 +159,7 @@ def main():
             col2.metric("Duration (months)", str(dd.max_drawdown_duration))
             col3.metric("Current Drawdown", fmt_pct(dd.current_drawdown))
             st.plotly_chart(dd.plot(), use_container_width=True)
-            if dd.max_drawdown_start is not None and dd.max_drawdown < 0:
+            if dd.max_drawdown_start is not None and dd.max_drawdown_end is not None and dd.max_drawdown < 0:
                 st.caption(
                     f"Worst drawdown: {str(dd.max_drawdown_start)[:7]} → {str(dd.max_drawdown_end)[:7]}"
                 )
