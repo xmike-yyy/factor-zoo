@@ -249,7 +249,7 @@ class FactorZoo:
         result: dict[str, pd.Series] = {}
         for a, b in combinations(factor_ids, 2):
             if a in wide.columns and b in wide.columns:
-                result[f"{a} vs {b}"] = _rolling_corr(wide[a], wide[b], window=window)
+                result[f"{a} vs {b}"] = _rolling_corr(pd.Series(wide[a]), pd.Series(wide[b]), window=window)
         return pd.DataFrame(result)
 
     # ------------------------------------------------------------------
