@@ -125,3 +125,17 @@ All factor IDs, sorted.
    ```bash
    uv run pytest
    ```
+
+## Deploying to Streamlit Cloud
+
+1. Fork this repo on GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io) and connect your fork
+3. Set **Main file path**: `factor_zoo/app.py`
+4. Under **Advanced settings → Startup command**, enter:
+   ```
+   python scripts/bootstrap_for_cloud.py
+   ```
+5. (Optional) Add a secret `FACTOR_ZOO_DB` to override the default DB path
+6. Click **Deploy** — the app auto-downloads the pre-built database on first start (~200 MB, ~2 min)
+
+The pre-built database is attached as a release asset on the [latest GitHub Release](../../releases/latest).
