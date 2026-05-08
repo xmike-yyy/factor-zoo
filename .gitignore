@@ -24,3 +24,4 @@ docs/
 
 # Claude Code internals
 .claude/
+.worktrees/
