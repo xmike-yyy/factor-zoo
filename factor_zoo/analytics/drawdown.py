@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,8 +13,8 @@ class DrawdownResult:
     factor_id: str
     drawdown_series: pd.Series       # underwater equity curve (0 to -1, DatetimeIndex)
     max_drawdown: float              # worst peak-to-trough (negative, or 0 if none)
-    max_drawdown_start: pd.Timestamp # date of the peak before max drawdown
-    max_drawdown_end: pd.Timestamp   # date of the trough of max drawdown
+    max_drawdown_start: Optional[pd.Timestamp] # date of the peak before max drawdown
+    max_drawdown_end: Optional[pd.Timestamp]   # date of the trough of max drawdown
     max_drawdown_duration: int       # months from peak to trough
     current_drawdown: float          # drawdown as of last observation
 
@@ -57,8 +58,8 @@ def compute_drawdown(returns: pd.Series, factor_id: str) -> DrawdownResult:
             factor_id=factor_id,
             drawdown_series=empty,
             max_drawdown=float("nan"),
-            max_drawdown_start=pd.NaT,
-            max_drawdown_end=pd.NaT,
+            max_drawdown_start=None,
+            max_drawdown_end=None,
             max_drawdown_duration=0,
             current_drawdown=float("nan"),
         )
@@ -81,8 +82,8 @@ def compute_drawdown(returns: pd.Series, factor_id: str) -> DrawdownResult:
             current_drawdown=0.0,
         )
 
-    trough_idx = dd_series.idxmin()
-    peak_idx = cum.loc[:trough_idx].idxmax()
+    trough_idx = pd.Timestamp(dd_series.idxmin())
+    peak_idx = pd.Timestamp(cum.loc[:trough_idx].idxmax())
     duration = len(dd_series.loc[peak_idx:trough_idx]) - 1
 
     return DrawdownResult(
